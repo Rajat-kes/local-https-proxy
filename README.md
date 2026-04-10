@@ -2,7 +2,7 @@
 
 Development proxy that terminates **TLS** locally and forwards traffic to an **HTTP or HTTPS** upstream. It removes **mixed-content** issues when a secure frontend must talk to an insecure API during local development.
 
-Built with [cors-anywhere](https://github.com/Rob--W/cors-anywhere) for CORS handling and request forwarding.
+Built with [`http-proxy`](https://github.com/http-party/node-http-proxy) as a transparent reverse proxy (method/path/query/body/headers are forwarded, with upstream host switched to target).
 
 ---
 
@@ -14,6 +14,7 @@ Built with [cors-anywhere](https://github.com/Rob--W/cors-anywhere) for CORS han
 - [Usage](#usage)
 - [Configuration](#configuration)
 - [Integrating your application](#integrating-your-application)
+- [CORS behavior](#cors-behavior)
 - [TLS certificates](#tls-certificates)
 - [Project structure](#project-structure)
 - [Security notice](#security-notice)
@@ -27,10 +28,9 @@ Built with [cors-anywhere](https://github.com/Rob--W/cors-anywhere) for CORS han
 | Capability | Description |
 |------------|-------------|
 | HTTPS entrypoint | Serves `https://<host>:<port>` so browsers treat calls as secure. |
-| Upstream routing | Rewrites paths to a configurable base URL (`DEFAULT_TARGET`). |
-| Optional full URLs | Paths may use cors-anywhere style `/http://host/...` or `/https://host/...` when you need an explicit target. |
+| Upstream routing | Forwards to configurable target (`DEFAULT_TARGET`) while preserving incoming path and query. |
 | Certificate bootstrap | Generates a self-signed key pair if certificate files are absent. |
-| Observability | Structured logs per request (method, URLs, status, duration). |
+| Observability | Structured logs + copy-ready curl for each proxied request. |
 | Developer workflow | `nodemon` reloads the process when source or certificate files change. |
 
 **Request flow (conceptual):**
@@ -85,13 +85,13 @@ The process listens on the host and port defined by `BIND_HOST` and `PORT` (see 
 
 ## Configuration
 
-All settings are supplied via **environment variables**. Defaults match [`config.js`](config.js).
+All settings are supplied via **environment variables**. Defaults match [`src/config/index.js`](src/config/index.js).
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `PORT` | `8085` | TCP port for the HTTPS listener. |
 | `BIND_HOST` | `localhost` | Bind address. Use `0.0.0.0` to accept connections from other machines on the network. |
-| `DEFAULT_TARGET` | `http://10.212.43.57:9220` | Upstream base URL. A scheme is added automatically if omitted (`http://` assumed). |
+| `DEFAULT_TARGET` | `http://10.212.43.57:9220` | Upstream target host/base URL. A scheme is added automatically if omitted (`http://` assumed). |
 | `CERT_DIR` | `./certificate` | Directory used for TLS material. |
 | `CERT_KEY_PATH` | `./certificate/server.key` | Path to the private key. |
 | `CERT_CRT_PATH` | `./certificate/server.crt` | Path to the certificate. |
@@ -115,7 +115,21 @@ npm run dev
 
 `https://localhost:8085/clientbackend/...`
 
-The service rewrites that to `DEFAULT_TARGET` + path unless the request already uses an explicit `/http://` or `/https://` prefix required by cors-anywhere.
+The service forwards that request to `DEFAULT_TARGET` while keeping method, path, query, request body, and headers/cookies.  
+`Host` is changed to the upstream host (`changeOrigin: true`), which is required by many upstream services.
+
+---
+
+## CORS behavior
+
+The proxy includes a permissive CORS fallback so browser calls do not fail when upstream does not return CORS headers.
+
+- Handles preflight `OPTIONS` directly with `204` + `Access-Control-Allow-*` headers.
+- For non-`OPTIONS` responses, adds missing CORS headers and keeps upstream-provided CORS headers as-is.
+- Uses request `Origin` when present; falls back to `*` otherwise.
+- Adds `Access-Control-Allow-Credentials: true` only when origin is explicit (not `*`), to keep headers browser-valid.
+
+This covers common browser CORS cases for local dev. If your team needs strict origin allowlists or method/header restrictions, add explicit CORS policy controls.
 
 ---
 
@@ -130,15 +144,18 @@ The service rewrites that to `DEFAULT_TARGET` + path unless the request already 
 ## Project structure
 
 ```text
-├── index.js           Application entry: HTTPS server and proxy wiring
-├── config.js          Environment-driven configuration
-├── utils/
-│   ├── cert.js        TLS file checks and self-signed generation
-│   ├── logger.js      Logging helpers
-│   ├── network.js     Local network address helper
-│   └── proxyUrl.js    Upstream URL normalization
-├── certificate/       TLS assets (optional; auto-generated if missing)
-├── nodemon.json       Development watch configuration
+├── src/
+│   ├── index.js           Application entry: HTTPS server + reverse proxy wiring
+│   ├── config/
+│   │   └── index.js       Environment-driven configuration
+│   └── utils/
+│       ├── cert.js        TLS file checks and self-signed generation
+│       ├── curlLog.js     Build copy-ready curl from proxied request
+│       ├── logger.js      Logging helpers
+│       ├── network.js     Local network address helper
+│       └── proxyUrl.js    Upstream target URL normalization
+├── certificate/           TLS assets (optional; auto-generated if missing)
+├── nodemon.json           Development watch configuration
 ├── package.json
 └── README.md
 ```
@@ -150,7 +167,7 @@ The service rewrites that to `DEFAULT_TARGET` + path unless the request already 
 This tool is intended for **local development only**.
 
 - It is not hardened for internet-facing deployment.
-- CORS is effectively permissive (aligned with cors-anywhere defaults used here).
+- CORS fallback is intentionally permissive for local development convenience.
 - Self-signed certificates are for convenience, not production identity.
 
 Do not expose this service to untrusted networks without a full security review and appropriate controls.
@@ -164,6 +181,7 @@ Do not expose this service to untrusted networks without a full security review 
 | `EADDRINUSE` | Another process is using `PORT`. Stop it or set a different `PORT`. |
 | Browser blocks or warns on HTTPS | Expected for self-signed certs; trust the cert locally or supply your own files. |
 | Upstream unreachable | Confirm `DEFAULT_TARGET`, VPN, and firewall rules from the machine running Node (not only from the browser). |
+| Still seeing CORS errors | Inspect response headers in DevTools. Some apps with strict credential/origin policy may require custom allowlist logic. |
 
 ---
 
