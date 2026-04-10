@@ -1,14 +1,14 @@
 {
-  "name": "localserver",
+  "name": "local-https-proxy",
   "version": "1.0.0",
-  "description": "",
+  "description": "Local HTTPS CORS proxy for dev",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
     "test": "echo \"No tests configured\""
   },
-  "author": "",
+  "author": "dev.rajat.kes@gmail.com",
   "license": "ISC",
   "dependencies": {
     "cors-anywhere": "^0.4.4",
