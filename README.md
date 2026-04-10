@@ -85,7 +85,12 @@ The process listens on the host and port defined by `BIND_HOST` and `PORT` (see 
 
 ## Configuration
 
-All settings are supplied via **environment variables**. Defaults match [`src/config/index.js`](src/config/index.js).
+Settings load from a root **`.env`** file (via [`dotenv`](https://github.com/motdotla/dotenv)) when present, then fall back to **shell environment variables**, then to defaults in [`src/config/index.js`](src/config/index.js).
+
+1. Copy [`.env.example`](.env.example) to `.env` in the project root.
+2. Edit `.env` for your machine. `.env` is gitignored.
+
+Shell exports still override `.env` values.
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
@@ -96,7 +101,15 @@ All settings are supplied via **environment variables**. Defaults match [`src/co
 | `CERT_KEY_PATH` | `./certificate/server.key` | Path to the private key. |
 | `CERT_CRT_PATH` | `./certificate/server.crt` | Path to the certificate. |
 
-**Example:**
+**Example (`.env`):**
+
+```bash
+DEFAULT_TARGET=http://api.local:3000
+PORT=8443
+BIND_HOST=0.0.0.0
+```
+
+**Example (shell overrides):**
 
 ```bash
 export DEFAULT_TARGET=http://api.local:3000
@@ -155,6 +168,7 @@ This covers common browser CORS cases for local dev. If your team needs strict o
 │       ├── network.js     Local network address helper
 │       └── proxyUrl.js    Upstream target URL normalization
 ├── certificate/           TLS assets (optional; auto-generated if missing)
+├── .env.example           Template for local env (copy to `.env`)
 ├── nodemon.json           Development watch configuration
 ├── package.json
 └── README.md

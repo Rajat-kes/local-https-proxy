@@ -11,6 +11,7 @@
   "author": "dev.rajat.kes@gmail.com",
   "license": "ISC",
   "dependencies": {
+    "dotenv": "^17.4.1",
     "http-proxy": "^1.18.1",
     "selfsigned": "^3.0.1"
   },
