@@ -1,5 +1,5 @@
 {
-  "watch": ["index.js", "certificate"],
+  "watch": ["index.js", "config.js", "utils", "certificate"],
   "ext": "js,json,crt,key",
   "ignore": ["node_modules"],
   "delay": "200ms",
