@@ -1,0 +1,7 @@
+{
+  "watch": ["index.js", "certificate"],
+  "ext": "js,json,crt,key",
+  "ignore": ["node_modules"],
+  "delay": "200ms",
+  "legacyWatch": true
+}
